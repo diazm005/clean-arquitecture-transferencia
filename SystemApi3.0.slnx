@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="Tests/Transferencias.Tests.csproj" />
+  </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Application/">
+    <Project Path="Application/Application.csproj" />
+  </Folder>
+  <Folder Name="/src/Domain/">
+    <Project Path="Domain/Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Infrastructure/">
+    <Project Path="AwsDocumentdbInfrastructure/CoreBancarioInfrastructure.csproj" Id="105f8f46-5553-4731-92d1-174d52da2682" />
+    <Project Path="AwsSqsInfrastructure/AntifraudeInfrastructure.csproj" Id="f2efc333-a840-4c44-a778-c00766f625df" />
+    <Project Path="FakeApiInfrastructure/AuditoriaInfrastructure.csproj" Id="b3fc4cd9-8949-480f-9c36-3daa56902b73" />
+    <Project Path="InternalHttpClientInfrastructure/NotificacionInfrastructure.csproj" Id="bd9a1462-bfb7-4ebf-ab1d-299b48ef76ca" />
+    <Project Path="MongodbInfrastructure/CamaraCompensatorioInfrastructure.csproj" Id="4e0cb85c-4fef-468d-9e29-727e326b3bdb" />
+  </Folder>
+  <Folder Name="/src/Presentation/">
+    <Project Path="SystemAPI/SystemAPI.csproj" Id="9ae40961-58be-45b9-b963-1cd9fe36719a" />
+  </Folder>
+</Solution>

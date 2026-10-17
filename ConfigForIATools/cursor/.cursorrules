@@ -1,0 +1,113 @@
+# System API 3.0 - Cursor Rules
+
+You are an expert .NET 10.0 developer specializing in Hexagonal Architecture and Clean Architecture patterns.
+
+## Project Context
+- Framework: ASP.NET Core 10.0
+- Architecture: Hexagonal (Ports & Adapters) + Clean Architecture
+- Build requirement: 0 errors, 0 warnings (TreatWarningsAsErrors=true)
+- Language: C# 13.0
+
+## CRITICAL Rules (ALWAYS follow)
+
+### 1. Architecture Boundaries
+- **Domain**: Pure business logic, ZERO external dependencies
+  - Only: entities, value objects, port interfaces
+  - Never: external libraries, infrastructure imports
+- **Application**: Use cases, validators, Result Pattern
+  - Only: business logic, FluentValidation, DTOs
+  - Never: direct DB calls, HTTP, external services
+- **Infrastructure**: Adapters for external systems
+  - Only: implement Domain ports, DB/HTTP/Cache access
+  - Never: business logic, validation rules
+- **Controllers**: Call use cases via IPort, never directly
+
+### 2. Code Style ENFORCED
+- **Naming**:
+  - PascalCase for types/methods
+  - camelCase for variables/parameters
+  - `I` prefix for interfaces (IUserPort)
+  - Async methods end with `Async`
+- **Formatting**:
+  - Indentation: 4 spaces (never tabs)
+  - Max line: 120 columns
+  - Braces: Allman style (opening on new line)
+
+### 3. Result Pattern (REQUIRED)
+- **ALL use cases return `EasyResult<T>`** (never throw)
+- Validation errors → `.Failure()` with error codes
+- Business errors → `.Failure()` with error details
+- Success → `.Success(result)`
+
+✅ GOOD:
+```csharp
+public async Task<EasyResult<UserDto>> RegisterAsync(
+    RegisterRequest req,
+    CancellationToken ct = default)
+{
+    var validation = FluentValidationExecutor.Execute(_validator, req);
+    if (validation.IsFailure) return validation;
+
+    var result = await _userPort.CreateAsync(req, ct);
+    return result.IsSuccess
+        ? EasyResult<UserDto>.Success(result.Value)
+        : EasyResult<UserDto>.Failure(result.Error);
+}
+```
+
+❌ BAD:
+```csharp
+public async Task<UserDto> RegisterAsync(RegisterRequest req)
+{
+    if (req == null) throw new ArgumentNullException(nameof(req));
+    return await _userPort.CreateAsync(req);
+}
+```
+
+### 4. Security CRITICAL
+- **Secrets**: NEVER hardcode passwords/API keys
+  - Use: Environment variables
+  - Store: Secure vaults (.env, Azure Key Vault)
+- **SQL Injection**: Always parameterized
+  - Use: Dapper with `@Parameter` syntax
+  - Never: String concatenation in SQL
+- **PII in Logs**: NEVER log sensitive data
+  - Never: passwords, emails, tokens, phone numbers
+  - Log: user IDs, actions, error codes only
+- **Auth**: Two mechanisms coexist
+  - JWT (AWS Cognito): `[Authorize(Policy = "ReadScope")]`
+  - Header Auth (x-scope): `[ArifyAuthorize("WriteScope")]`
+- **CancellationToken**: Propagate through entire async chain
+  - Add to all async methods: `CancellationToken ct = default`
+  - Pass to I/O operations: database, HTTP, file access
+
+### 5. Testing (xUnit + Moq)
+- **Pattern**: `[Method]_Should[Behavior]_When[Condition]`
+- **Structure**: Arrange/Act/Assert in each test
+- **Coverage**: Happy path + ALL error cases
+- **Mocks**: Always verify calls
+  - `mockPort.Verify(x => x.Method(...), Times.Once())`
+  - `mockPort.Verify(x => x.Method(...), Times.Never())`
+- **Classes**: Implement `IDisposable` for cleanup
+
+### 6. Build & Deployment
+- **Build**: `dotnet build` → Must produce 0 errors, 0 warnings
+- **Tests**: `dotnet test` → All tests must pass
+- **Analyzers**: 7 active with TreatWarningsAsErrors=true
+
+## Before EVERY Commit
+1. ✅ `dotnet build` → 0 errors, 0 warnings
+2. ✅ `dotnet test Application.Tests/` → All tests pass
+3. ✅ `git diff --staged` → Review security issues
+4. ✅ Conventional Commits: `feat(scope): description`
+
+## When to Use Agents
+- `@code-reviewer` → Verify architecture, Result Pattern, layer violations
+- `@security-auditor` → Check hardcoded secrets, SQL injection, PII in logs
+- `@refactor-cleaner` → Find dead code, unused ports, DI orphans
+- `@dependency-auditor` → Check NuGet version drift and CVEs
+
+## References
+- **CLAUDE.md** → Full architecture guide
+- **AGENTS.md** → Agent descriptions
+- **shared-ia/template.md** → Skills and agents overview

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <!-- Se conservan los archivos de la plantilla; solo se compilan los adaptadores del taller. -->
+  <PropertyGroup><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Simulacion/**/*.cs" />
+    <ProjectReference Include="../Domain/Domain.csproj" />
+  </ItemGroup>
+</Project>

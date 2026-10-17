@@ -1,0 +1,24 @@
+@baseUrl = http://localhost:5207
+
+### Consultar cliente
+GET {{baseUrl}}/api/client/12345678
+
+### Consultar cuenta
+GET {{baseUrl}}/api/account/001
+
+### Transferir: cambia el ID para una operación nueva
+POST {{baseUrl}}/api/transactions
+Content-Type: application/json
+
+{
+  "operacionId": "11111111-1111-4111-8111-111111111111",
+  "clienteDni": "12345678",
+  "cuentaOrigen": "001",
+  "cuentaDestino": "EXTERNA",
+  "bancoDestino": "BANCO_B",
+  "monto": 100,
+  "codigoOtp": null
+}
+
+### Consultar resultado
+GET {{baseUrl}}/api/transactions/11111111-1111-4111-8111-111111111111

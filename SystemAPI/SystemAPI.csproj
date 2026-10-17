@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="10.1.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="10.1.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.1.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.15.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Application\Application.csproj" />
+    <ProjectReference Include="../AwsDocumentdbInfrastructure/CoreBancarioInfrastructure.csproj" />
+    <ProjectReference Include="../AwsSqsInfrastructure/AntifraudeInfrastructure.csproj" />
+    <ProjectReference Include="../FakeApiInfrastructure/AuditoriaInfrastructure.csproj" />
+    <ProjectReference Include="../MongodbInfrastructure/CamaraCompensatorioInfrastructure.csproj" />
+    <ProjectReference Include="../InternalHttpClientInfrastructure/NotificacionInfrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

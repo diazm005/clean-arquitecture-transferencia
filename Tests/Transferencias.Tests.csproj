@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Application/Application.csproj" />
+    <ProjectReference Include="../AwsDocumentdbInfrastructure/CoreBancarioInfrastructure.csproj" />
+    <ProjectReference Include="../AwsSqsInfrastructure/AntifraudeInfrastructure.csproj" />
+    <ProjectReference Include="../FakeApiInfrastructure/AuditoriaInfrastructure.csproj" />
+    <ProjectReference Include="../MongodbInfrastructure/CamaraCompensatorioInfrastructure.csproj" />
+    <ProjectReference Include="../InternalHttpClientInfrastructure/NotificacionInfrastructure.csproj" />
+  </ItemGroup>
+</Project>

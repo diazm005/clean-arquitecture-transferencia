@@ -1,0 +1,25 @@
+{
+  "projectName": "System API 3.0",
+  "projectDescription": "ASP.NET Core 10.0 Microservice with Hexagonal Architecture",
+  "language": "csharp",
+  "framework": "dotnet10",
+  "architecture": "hexagonal-clean-architecture",
+  "rulesFile": ".cursorrules",
+  "documentationFiles": [
+    "CLAUDE.md",
+    "AGENTS.md"
+  ],
+  "agents": "agents/",
+  "skills": "skills/",
+  "buildCommand": "dotnet build",
+  "testCommand": "dotnet test Application.Tests/Application.Tests.csproj",
+  "runCommand": "dotnet run --project SystemAPI/SystemAPI.csproj",
+  "defaultAgent": "code-reviewer",
+  "aiModel": "claude-3.5-sonnet",
+  "keyBindings": {
+    "build": "ctrl+shift+b",
+    "test": "ctrl+shift+t",
+    "code-review": "ctrl+alt+r",
+    "security-check": "ctrl+alt+s"
+  }
+}
