@@ -1,10 +1,11 @@
 using Application.Adapters;
-using Domain.Entities.Internals;
+using Application.Internals.Adapters;
+using Application.Internals.Executors;
 namespace Application.Ports;
 public interface IRealizarTransferencia
 {
     /// <summary>
-    /// Procesa la solicitud de transferencia y devuelve el estado de la operación junto con su motivo.
+    /// Initiates a payment execution. The HTTP status of the result reflects the operation state; 400 and 409 indicate an invalid request or a reused reference.
     /// </summary>
-    Task<Transferencia> EjecutarAsync(SolicitudTransferencia solicitud, CancellationToken ct = default);
+    Task<EasyResult<InitiatePaymentExecutionAdapter>> InitiatePaymentExecutionAsync(TraceIdentifierAdapter trace, InitiatePaymentExecutionRequest request, CancellationToken ct = default);
 }

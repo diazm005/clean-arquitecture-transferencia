@@ -1,18 +1,16 @@
 using Application.Ports;
 using Microsoft.AspNetCore.Mvc;
+using SystemAPI.Helpers;
 namespace SystemAPI.Controllers;
 
 [ApiController]
 [Route("api/client")]
-public sealed class ClienteController(IConsultarCliente consultar) : ControllerBase
+public sealed class ClienteController(IConsultarCliente customer) : ControllerBase
 {
-    [HttpGet("{dni}")]
     /// <summary>
-    /// Devuelve los datos del cliente o una respuesta HTTP 404 cuando no existe.
+    /// Returns the customer data (RetrieveCustomerResponse) or HTTP 404 when it does not exist.
     /// </summary>
-    public async Task<IActionResult> ConsultarCliente(string dni, CancellationToken ct)
-    {
-        var cliente = await consultar.ConsultarClienteAsync(dni, ct);
-        return cliente is null ? NotFound() : Ok(cliente);
-    }
+    [HttpGet("{nationalId}")]
+    public async Task<IActionResult> RetrieveCustomer(string nationalId, CancellationToken ct) =>
+        this.ToActionResult(await customer.RetrieveCustomerAsync(Request.ToTrace(), nationalId, ct));
 }

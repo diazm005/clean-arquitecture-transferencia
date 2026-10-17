@@ -28,6 +28,17 @@ public sealed class EasyResult<T>
         SuccessValue = successValue
     };
 
+    // Resultado con estado HTTP propio; también sirve para resultados de negocio con cuerpo (por ejemplo, 202 o 422).
+    public static EasyResult<T> Success(T successValue, int status) => new()
+    {
+        IsSuccess = status < 400,
+        Status = status,
+        SuccessValue = successValue
+    };
+
+    public static EasyResult<T> Failure(int status, string code, string message) =>
+        Failure(status, [new ValidationResultAdapter { Code = code, Message = message }]);
+
     public static EasyResult<T> Failure(int status, IReadOnlyCollection<ValidationResultAdapter> validationValues) => new()
     {
         IsSuccess = false,

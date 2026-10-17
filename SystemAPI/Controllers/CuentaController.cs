@@ -1,18 +1,16 @@
 using Application.Ports;
 using Microsoft.AspNetCore.Mvc;
+using SystemAPI.Helpers;
 namespace SystemAPI.Controllers;
 
 [ApiController]
 [Route("api/account")]
-public sealed class CuentaController(IConsultarCuenta consultar) : ControllerBase
+public sealed class CuentaController(IConsultarCuenta account) : ControllerBase
 {
-    [HttpGet("{numero}")]
     /// <summary>
-    /// Devuelve los datos de la cuenta y su saldo actual, o HTTP 404 cuando no existe.
+    /// Returns the account and its available balance (RetrieveAccountResponse) or HTTP 404 when it does not exist.
     /// </summary>
-    public async Task<IActionResult> ConsultarCuenta(string numero, CancellationToken ct)
-    {
-        var cuenta = await consultar.ConsultarCuentaAsync(numero, ct);
-        return cuenta is null ? NotFound() : Ok(cuenta);
-    }
+    [HttpGet("{accountNumber}")]
+    public async Task<IActionResult> RetrieveAccount(string accountNumber, CancellationToken ct) =>
+        this.ToActionResult(await account.RetrieveAccountAsync(Request.ToTrace(), accountNumber, ct));
 }

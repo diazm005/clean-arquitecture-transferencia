@@ -1,9 +1,11 @@
-using Domain.Entities.Internals;
+using Application.Adapters;
+using Application.Internals.Adapters;
+using Application.Internals.Executors;
 namespace Application.Ports;
 public interface IConsultarCuenta
 {
     /// <summary>
-    /// Define la consulta de una cuenta por número; devuelve null si no existe.
+    /// Retrieves an account and its available balance. Returns 200 with the account or 404 when it does not exist.
     /// </summary>
-    Task<Cuenta?> ConsultarCuentaAsync(string numero, CancellationToken ct = default);
+    Task<EasyResult<RetrieveAccountAdapter>> RetrieveAccountAsync(TraceIdentifierAdapter trace, string accountNumber, CancellationToken ct = default);
 }

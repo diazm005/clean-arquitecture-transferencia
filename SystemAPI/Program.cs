@@ -1,4 +1,7 @@
 using Application;
+using Application.Internals.Adapters;
+using Microsoft.AspNetCore.Mvc;
+using SystemAPI.Helpers;
 using AntifraudeInfrastructure;
 using AuditoriaInfrastructure;
 using CamaraCompensatorioInfrastructure;
@@ -25,7 +28,14 @@ builder.Services.AddSingleton<ISegmentoLimiteRepository, SegmentoLimiteRepositor
 builder.Services.AddSingleton<ICamaraCompensacionGateway, CamaraCompensacionAdapter>();
 builder.Services.AddSingleton<INotificadorCliente, NotificacionesAdapter>();
 builder.Services.AddHealthChecks();
-builder.Services.AddControllers().AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    // Malformed bodies (for example an invalid GUID) also answer with the BIAN errors list.
+    .ConfigureApiBehaviorOptions(o => o.InvalidModelStateResponseFactory = ctx =>
+        new ObjectResult(EasyBianResponseHelper.WarningResponse(ctx.ModelState
+            .SelectMany(e => e.Value!.Errors.Select(x => new ValidationResultAdapter
+                { Code = "400", Message = string.IsNullOrEmpty(x.ErrorMessage) ? "Solicitud inválida." : x.ErrorMessage, Field = e.Key }))
+            .ToList())) { StatusCode = 400 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddProblemDetails();

@@ -67,7 +67,7 @@ de la demo. Los handlers originales siguen disponibles para una integración pos
 1. SystemAPI/Controllers/TransferenciasController.cs recibe JSON y traduce el
    resultado a HTTP. No calcula comisiones ni límites.
 2. Application/Ports/IRealizarTransferencia.cs define la entrada del caso de uso.
-3. Application/Usecases/TransferenciaUseCase/ValidarTransferencia.cs coordina
+3. Application/Handlers/Transferencias/RealizarTransferenciaHandler.cs coordina
    cliente, cuenta, límite, antifraude, OTP, débito, cámara, auditoría y notificación.
 4. Domain/Entities/Internals/Reglas.cs contiene reglas puras, fáciles de probar.
    CalculadoraDeComision.cs determina el costo por banco.
@@ -76,7 +76,7 @@ de la demo. Los handlers originales siguen disponibles para una integración pos
    de datos podrá reemplazarlo manteniendo el contrato.
 7. SystemAPI/Program.cs registra las implementaciones usando inyección de dependencias.
 
-Por ejemplo: el constructor de ValidarTransferencia recibe IAntifraudeService.
+Por ejemplo: el constructor de RealizarTransferenciaHandler recibe IAntifraudeService.
 No sabe si quien responde usa HTTP, una base de datos o datos simulados. Esa
 separación permite probar el flujo sin disponer del core bancario.
 

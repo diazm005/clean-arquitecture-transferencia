@@ -1,9 +1,11 @@
-using Domain.Entities.Internals;
+using Application.Adapters;
+using Application.Internals.Adapters;
+using Application.Internals.Executors;
 namespace Application.Ports;
 public interface IConsultarCliente
 {
     /// <summary>
-    /// Define la consulta de un cliente por DNI; devuelve null si no existe.
+    /// Retrieves a customer by national ID. Returns 200 with the customer or 404 when it does not exist.
     /// </summary>
-    Task<Cliente?> ConsultarClienteAsync(string dni, CancellationToken ct = default);
+    Task<EasyResult<RetrieveCustomerAdapter>> RetrieveCustomerAsync(TraceIdentifierAdapter trace, string nationalId, CancellationToken ct = default);
 }

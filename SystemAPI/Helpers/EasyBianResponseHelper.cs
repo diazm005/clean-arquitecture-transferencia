@@ -57,7 +57,7 @@ public static class EasyBianResponseHelper
             errors[index++] = new BianErrorInternalModel
             {
                 Status_code = error.Code,
-                Message = string.Concat(error.Message, InSeparator, fieldName)
+                Message = string.IsNullOrEmpty(error.Field) ? error.Message : string.Concat(error.Message, InSeparator, fieldName)
             };
         }
 
