@@ -15,29 +15,19 @@ public sealed class RealizarTransferenciaHandler(
     ISegmentoLimiteRepository limits, IOtpService otp,
     ICamaraCompensacionGateway clearingHouse, IAuditoriaRepository audit,
     INotificadorCliente notifier, TimeProvider clock,
-    ILogger<RealizarTransferenciaHandler> logger) : IRealizarTransferencia
+    ILogger<RealizarTransferenciaHandler> logger,
+    IConsultarBancoRepository banks, IControlOperacion operationControl) : IRealizarTransferencia
 {
     private static readonly InitiatePaymentExecutionRequestValidator Validator = new();
-    private readonly SemaphoreSlim _turn = new(1, 1);
 
     /// <summary>
-    /// Processes one request at a time to avoid duplicate debits within this application instance.
+    /// Valida la entrada y reserva la referencia durante todo el flujo para impedir ejecuciones duplicadas.
     /// </summary>
     public async Task<EasyResult<InitiatePaymentExecutionAdapter>> InitiatePaymentExecutionAsync(
         TraceIdentifierAdapter trace, InitiatePaymentExecutionRequest request, CancellationToken ct = default)
     {
         using var _ = logger.BeginTraceScope(trace, request.TransactionReference);
         logger.LogInformation("Solicitud de transferencia recibida.");
-        await _turn.WaitAsync(ct);
-        try { return await ProcessAsync(request, ct); }
-        finally { _turn.Release(); }
-    }
-
-    /// <summary>
-    /// Orchestrates the flow: validates the request, reuses previous operations, applies business rules, evaluates risk and OTP, and executes the movement.
-    /// </summary>
-    private async Task<EasyResult<InitiatePaymentExecutionAdapter>> ProcessAsync(InitiatePaymentExecutionRequest request, CancellationToken ct)
-    {
         var validation = Validator.Validate(request);
         if (!validation.IsValid)
         {
@@ -47,27 +37,50 @@ public sealed class RealizarTransferenciaHandler(
                 .ToList());
         }
 
-        var previous = await GetPreviousResultAsync(request, ct);
+        await using var turn = await operationControl.AdquirirAsync(request.TransactionReference, ct);
+        return await ProcessAsync(request, ct);
+    }
+
+    /// <summary>Consulta las entidades, aplica las reglas del dominio y coordina riesgo, OTP y movimiento.</summary>
+    private async Task<EasyResult<InitiatePaymentExecutionAdapter>> ProcessAsync(InitiatePaymentExecutionRequest request, CancellationToken ct)
+    {
+        var stored = await audit.ObtenerAsync(request.TransactionReference, ct);
+
+        var previous = GetPreviousResult(request, stored);
         if (previous is not null) return previous;
 
         var now = clock.GetUtcNow();
         var date = DateOnly.FromDateTime(now.ToOffset(TimeSpan.FromHours(-5)).DateTime);
-        var transfer = new Transferencia(request.TransactionReference, request.CustomerNationalId, request.SourceAccountNumber,
+        var transfer = stored ?? new Transferencia(request.TransactionReference, request.CustomerNationalId, request.SourceAccountNumber,
             request.DestinationAccountNumber, request.DestinationBank, request.Amount, 0, now, EstadoTransferencia.Rechazada, "");
 
         var customer = await customers.ObtenerClienteAsync(request.CustomerNationalId, ct);
         var account = await accounts.ObtenerCuentaAsync(request.SourceAccountNumber, ct);
+        // Sin entidades válidas no se puede generar una transferencia con claves foráneas. El rechazo queda en el log.
         if (customer is null || account is null || account.ClienteDni != request.CustomerNationalId)
-            return await FinalizeAsync(transfer with { Mensaje = "Cliente o cuenta de origen inválidos." });
-        if (request.SourceAccountNumber == request.DestinationAccountNumber && account.Banco == request.DestinationBank)
-            return await FinalizeAsync(transfer with { Mensaje = "Las cuentas de origen y destino deben ser diferentes." });
+            return RejectUnresolved(transfer, "Cliente o cuenta de origen inválidos.");
+        if (!await banks.ExisteAsync(request.DestinationBank, ct))
+            return RejectUnresolved(transfer, "El banco de destino no está habilitado.");
+        var internalTransfer = string.Equals(account.Banco, request.DestinationBank, StringComparison.OrdinalIgnoreCase);
+        if (internalTransfer && request.SourceAccountNumber == request.DestinationAccountNumber)
+            return RejectUnresolved(transfer, "Las cuentas de origen y destino deben ser diferentes.");
+        if (internalTransfer)
+        {
+            var destination = await accounts.ObtenerCuentaAsync(request.DestinationAccountNumber, ct);
+            if (destination is null || !destination.Activa)
+                return await FinalizeAsync(transfer with { Estado = EstadoTransferencia.Rechazada, Mensaje = "Cuenta de destino inválida." });
+        }
 
-        transfer = transfer with { Comision = CalculadoraDeComision.Calcular(account.Banco, request.DestinationBank) };
+        transfer = transfer with { Estado = EstadoTransferencia.Rechazada, Notificada = false,
+            Comision = stored?.Comision ?? CalculadoraDeComision.Calcular(account.Banco, request.DestinationBank) };
         var limit = await limits.ObtenerLimiteAsync(customer.Segmento, ct);
         var accumulated = await core.ObtenerAcumuladoAsync(customer.Dni, date, ct);
         var error = Reglas.Validar(account, request.Amount, transfer.Comision, accumulated, limit);
         if (error is not null) return await FinalizeAsync(transfer with { Mensaje = error });
 
+        // El seguimiento de fraude referencia una transferencia existente. NoDisponible permite reintentar sin mover dinero.
+        await audit.GuardarAsync(transfer with { Estado = EstadoTransferencia.NoDisponible,
+            Mensaje = "Evaluación antifraude pendiente. No se ha debitado dinero." }, ct);
         var risk = await EvaluateRiskAsync(transfer, ct);
         if (risk is null)
             return await FinalizeAsync(transfer with { Estado = EstadoTransferencia.NoDisponible,
@@ -80,18 +93,20 @@ public sealed class RealizarTransferenciaHandler(
                 Mensaje = "Se requiere un OTP válido para confirmar la operación." });
 
         ct.ThrowIfCancellationRequested();
-        return await ExecuteMovementAsync(transfer, account, date, limit);
+        // La espera de antifraude puede cruzar medianoche: el débito consume el día efectivo del movimiento.
+        var debitDate = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(-5)).DateTime);
+        return await ExecuteMovementAsync(transfer, account, debitDate, limit);
     }
 
     /// <summary>
-    /// Returns the stored result when the operation cannot be re-evaluated, 409 when the reference is reused with other data, or null when it is new or has not moved money yet.
+    /// Reutiliza el resultado registrado; rechaza una referencia con otros datos y permite reintentos sin movimiento previo.
     /// </summary>
-    private async Task<EasyResult<InitiatePaymentExecutionAdapter>?> GetPreviousResultAsync(InitiatePaymentExecutionRequest request, CancellationToken ct)
+    private EasyResult<InitiatePaymentExecutionAdapter>? GetPreviousResult(InitiatePaymentExecutionRequest request, Transferencia? previous)
     {
-        var previous = await audit.ObtenerAsync(request.TransactionReference, ct);
         if (previous is null) return null;
         if (previous.ClienteDni != request.CustomerNationalId || previous.CuentaOrigen != request.SourceAccountNumber ||
-            previous.CuentaDestino != request.DestinationAccountNumber || previous.BancoDestino != request.DestinationBank ||
+            previous.CuentaDestino != request.DestinationAccountNumber ||
+            !string.Equals(previous.BancoDestino, request.DestinationBank, StringComparison.OrdinalIgnoreCase) ||
             previous.Monto != request.Amount)
         {
             logger.LogWarning("ID de operación reutilizado con otros datos.");
@@ -104,13 +119,14 @@ public sealed class RealizarTransferenciaHandler(
     }
 
     /// <summary>
-    /// Queries the antifraud service with a 2 second limit. Returns null when the service is unavailable.
+    /// Acota a cinco segundos la consulta de riesgo. El adaptador registra el fallo antes de terminar si hay cancelación.
     /// </summary>
     private async Task<NivelRiesgo?> EvaluateRiskAsync(Transferencia transfer, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(2));
-        try { return await antifraud.EvaluarAsync(transfer, timeout.Token).WaitAsync(timeout.Token); }
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        // Los adaptadores respetan el token; esperamos su cierre de auditoría para no dejar tareas fuera del bloqueo de operación.
+        try { return await antifraud.EvaluarAsync(transfer, timeout.Token); }
         catch (Exception ex) when (ex is TimeoutException or HttpRequestException ||
             ex is OperationCanceledException && !ct.IsCancellationRequested)
         {
@@ -120,19 +136,18 @@ public sealed class RealizarTransferenciaHandler(
     }
 
     /// <summary>
-    /// Records the operation as pending, debits the core and sends it to the clearing house when the destination bank differs. From here an HTTP disconnect does not interrupt the record.
+    /// Registra el intento financiero, debita y envía a la cámara. Desde aquí una desconexión HTTP no cancela el registro.
     /// </summary>
     private async Task<EasyResult<InitiatePaymentExecutionAdapter>> ExecuteMovementAsync(
         Transferencia transfer, Cuenta account, DateOnly date, decimal limit)
     {
         transfer = transfer with { Estado = EstadoTransferencia.Pendiente, Mensaje = "Operación pendiente de conciliación." };
         await audit.GuardarAsync(transfer, CancellationToken.None);
+        string? error;
         try
         {
-            var error = await core.DebitarAsync(transfer, date, limit, CancellationToken.None);
-            if (error is not null)
-                return await FinalizeAsync(transfer with { Estado = EstadoTransferencia.Rechazada, Mensaje = error });
-            if (!string.Equals(account.Banco, transfer.BancoDestino, StringComparison.OrdinalIgnoreCase))
+            error = await core.DebitarAsync(transfer, date, limit, CancellationToken.None);
+            if (error is null && !string.Equals(account.Banco, transfer.BancoDestino, StringComparison.OrdinalIgnoreCase))
                 await clearingHouse.EnviarAsync(transfer, CancellationToken.None);
         }
         catch (Exception ex)
@@ -141,19 +156,20 @@ public sealed class RealizarTransferenciaHandler(
             logger.LogError(ex, "Resultado incierto al debitar o enviar a la cámara; la operación queda pendiente.");
             return await FinalizeAsync(transfer);
         }
+        if (error is not null)
+            return await FinalizeAsync(transfer with { Estado = EstadoTransferencia.Rechazada, Mensaje = error });
         return await FinalizeAsync(transfer with { Estado = EstadoTransferencia.Completada, Mensaje = "Transferencia completada." });
     }
 
     /// <summary>
-    /// Stores the result, tries to notify the customer and records whether the notification was accepted, without changing the financial state when notification fails.
+    /// Guarda el resultado y solicita la notificación; una falla de mensajería no cambia el estado financiero.
     /// </summary>
     private async Task<EasyResult<InitiatePaymentExecutionAdapter>> FinalizeAsync(Transferencia transfer)
     {
         await audit.GuardarAsync(transfer, CancellationToken.None);
         try
         {
-            await notifier.NotificarAsync(transfer, CancellationToken.None);
-            transfer = transfer with { Notificada = true };
+            transfer = transfer with { Notificada = await notifier.NotificarAsync(transfer, CancellationToken.None) };
         }
         catch (Exception ex)
         {
@@ -166,7 +182,7 @@ public sealed class RealizarTransferenciaHandler(
     }
 
     /// <summary>
-    /// Translates the operation state to the HTTP status of the result, keeping the payment execution as the body.
+    /// Traduce el estado de negocio al código HTTP y conserva el contrato de respuesta de la API.
     /// </summary>
     private static EasyResult<InitiatePaymentExecutionAdapter> Respond(Transferencia transfer) =>
         EasyResult<InitiatePaymentExecutionAdapter>.Success(transfer.ToAdapter<InitiatePaymentExecutionAdapter>(), transfer.Estado switch
@@ -177,4 +193,10 @@ public sealed class RealizarTransferenciaHandler(
             EstadoTransferencia.RequiereConfirmacion => 409,
             _ => 422
         });
+
+    private EasyResult<InitiatePaymentExecutionAdapter> RejectUnresolved(Transferencia transfer, string message)
+    {
+        logger.LogWarning("Solicitud rechazada antes del registro financiero: {Motivo}", message);
+        return Respond(transfer with { Estado = EstadoTransferencia.Rechazada, Mensaje = message, Notificada = false });
+    }
 }

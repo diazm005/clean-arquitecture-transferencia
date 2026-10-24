@@ -14,11 +14,16 @@ public static class ApplicationSetting
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
-        services.AddTransient<IConsultarCliente, ConsultarClienteHandler>();
-        services.AddTransient<IConsultarCuenta, ConsultarCuentaHandler>();
-        services.AddTransient<IConsultarTransferencia, ConsultarTransferenciaHandler>();
-        // Una instancia coordina solicitudes concurrentes en la demo de un solo proceso.
-        services.AddSingleton<IRealizarTransferencia, RealizarTransferenciaHandler>();
+        services.AddScoped<ConsultarClienteHandler>();
+        services.AddScoped<ConsultarCuentaHandler>();
+        services.AddScoped<ConsultarTransferenciaHandler>();
+        // El control de concurrencia pertenece al adaptador; cada solicitud obtiene su propio handler.
+        services.AddScoped<RealizarTransferenciaHandler>();
+        services.AddScoped<Handlers.AccesoCliente>();
+        services.AddScoped<IConsultarCliente>(sp => sp.GetRequiredService<Handlers.AccesoCliente>());
+        services.AddScoped<IConsultarCuenta>(sp => sp.GetRequiredService<Handlers.AccesoCliente>());
+        services.AddScoped<IConsultarTransferencia>(sp => sp.GetRequiredService<Handlers.AccesoCliente>());
+        services.AddScoped<IRealizarTransferencia>(sp => sp.GetRequiredService<Handlers.AccesoCliente>());
         return services;
     }
 }

@@ -3,7 +3,7 @@ namespace Domain.Interfaces;
 public interface INotificadorCliente
 {
     /// <summary>
-    /// Solicita la notificación del resultado al cliente a través del canal implementado por el adaptador.
+    /// Solicita la notificación. Devuelve true solo si el adaptador confirma el envío; encolar no equivale a entregar.
     /// </summary>
-    Task NotificarAsync(Transferencia transferencia, CancellationToken ct = default);
+    Task<bool> NotificarAsync(Transferencia transferencia, CancellationToken ct = default);
 }

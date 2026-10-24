@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/tests/">
     <Project Path="Tests/Transferencias.Tests.csproj" />
+    <Project Path="Tests.Api/Transferencias.Api.Tests.csproj" />
+    <Project Path="Tests.Infrastructure/Transferencias.Infrastructure.Tests.csproj" />
   </Folder>
   <Folder Name="/src/" />
   <Folder Name="/src/Application/">
@@ -10,6 +12,7 @@
     <Project Path="Domain/Domain.csproj" />
   </Folder>
   <Folder Name="/src/Infrastructure/">
+    <Project Path="SqlServerInfrastructure/SqlServerInfrastructure.csproj" />
     <Project Path="AwsDocumentdbInfrastructure/CoreBancarioInfrastructure.csproj" Id="105f8f46-5553-4731-92d1-174d52da2682" />
     <Project Path="AwsSqsInfrastructure/AntifraudeInfrastructure.csproj" Id="f2efc333-a840-4c44-a778-c00766f625df" />
     <Project Path="FakeApiInfrastructure/AuditoriaInfrastructure.csproj" Id="b3fc4cd9-8949-480f-9c36-3daa56902b73" />
@@ -18,5 +21,8 @@
   </Folder>
   <Folder Name="/src/Presentation/">
     <Project Path="SystemAPI/SystemAPI.csproj" Id="9ae40961-58be-45b9-b963-1cd9fe36719a" />
+  </Folder>
+  <Folder Name="/src/Processes/">
+    <Project Path="FraudBatch/FraudBatch.csproj" />
   </Folder>
 </Solution>

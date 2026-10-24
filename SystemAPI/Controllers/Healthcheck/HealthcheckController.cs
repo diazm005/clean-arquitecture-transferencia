@@ -65,6 +65,7 @@ public class HealthcheckController : ControllerBase
     }
 
     [HttpGet("ping")]
+    [AllowAnonymous]
     public IActionResult Ping()
     {
         return Ok(new { message = "pong", timestamp = DateTime.UtcNow });
@@ -108,6 +109,7 @@ public class HealthcheckController : ControllerBase
     }
 
     [HttpGet("health/live")]
+    [AllowAnonymous]
     public async Task<IActionResult> HealthLive()
     {
         var healthReport = await _healthCheckService.CheckHealthAsync(reg => reg.Tags.Contains("live"));

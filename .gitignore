@@ -402,3 +402,20 @@ FodyWeavers.xsd
 .env.*
 !.env.example
 .DS_Store
+
+# La nueva etapa se mantiene en su propio repositorio.
+/TallerTransferencias/
+
+# Configuración privada y archivos de la base; los scripts SQL sí se versionan.
+**/secrets.json
+**/appsettings.Local.json
+**/appsettings.*.local.json
+*.pem
+*.key
+*.p12
+*.bak
+*.bacpac
+*.mdf
+*.ndf
+*.ldf
+*.trn

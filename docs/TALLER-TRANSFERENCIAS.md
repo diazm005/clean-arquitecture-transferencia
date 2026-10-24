@@ -1,8 +1,9 @@
 # Taller de transferencias — Clean Architecture
 
 Esta implementación amplía las clases de tu solución SystemApi3.0.slnx en .NET 10.
-Es una demo local: todos los adaptadores son simulados, el estado se pierde al reiniciar,
-el OTP es fijo y no se envía dinero ni SMS ni correos reales.
+La guía siguiente describe la demo en memoria, cuyo estado se pierde al reiniciar.
+También existe [persistencia SQL con EF y batch de fraude](EF-Y-FRAUDE.md).
+El OTP sigue fijo y no se envía dinero ni SMS ni correos reales.
 
 ## Ejecutar
 
@@ -92,7 +93,7 @@ separación permite probar el flujo sin disponer del core bancario.
 | Fecha del límite | Día de Lima, UTC-5 |
 | OTP | Desde S/ 10 000 inclusive, o riesgo medio |
 | Riesgo alto | Rechazo incluso con OTP |
-| Antifraude no disponible | HTTP 503, sin débito; timeout de dos segundos |
+| Antifraude no disponible | HTTP 503, sin débito; cliente HTTP dos segundos y caso de uso cinco, más cierre del registro de error |
 | Mismo banco | Débito y crédito al destino local en una operación atómica |
 | Cámara sin respuesta | Pendiente; se conserva débito y consumo del límite |
 | Auditoría | Historial de estados y consulta del último resultado |
@@ -158,15 +159,16 @@ Escenarios controlados mediante cuentaDestino:
 
 ## Alcance y siguientes pasos
 
-La protección de concurrencia e idempotencia es solo en memoria, en una instancia.
-Para producción se requiere persistencia transaccional, claves únicas, coordinación
-entre instancias y conciliación de operaciones pendientes. Un timeout de cámara
-no autoriza por sí solo a reembolsar ni a volver a enviar.
+En modo memoria, la coordinación protege una instancia. El modo SQL incorpora
+persistencia transaccional, claves únicas y bloqueos compartidos entre instancias;
+queda pendiente validarlo contra el servidor y desarrollar conciliación. Un timeout
+de cámara no autoriza por sí solo a reembolsar ni a volver a enviar.
 
 Faltan adaptadores reales, validación del destino externo, OTP ligado a operación
-con caducidad y uso único, autenticación y autorización por titular, auditoría durable,
-outbox/reintentos de notificación y políticas de timeout/circuit breaker de los
-servicios reales. Notificada significa agregada a la cola simulada, no entrega real.
+con caducidad y uso único, autenticación y autorización por titular, envío/reintentos
+de notificación y políticas de timeout/circuit breaker de los servicios reales.
+La auditoría y la cola de notificaciones ya tienen adaptadores SQL; en ese modo
+Notificada permanece en false mientras no se confirme la entrega. La demo en memoria simula el envío.
 La cancelación del cliente se respeta antes de mover dinero; después se finaliza el
 registro independientemente de la conexión HTTP. Las llamadas reales posteriores
 necesitarán timeouts propios.

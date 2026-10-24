@@ -8,11 +8,11 @@ public sealed class NotificacionesAdapter : INotificadorCliente
     private readonly ConcurrentQueue<Transferencia> _notificaciones = new();
     public IReadOnlyCollection<Transferencia> Notificaciones => _notificaciones.ToArray();
     /// <summary>
-    /// Agrega el resultado a la cola de notificaciones en memoria. No envía SMS ni correos reales.
+    /// Registra un envío simulado en memoria; el taller no envía SMS ni correos reales.
     /// </summary>
-    public Task NotificarAsync(Transferencia t, CancellationToken ct = default)
+    public Task<bool> NotificarAsync(Transferencia t, CancellationToken ct = default)
     {
         _notificaciones.Enqueue(t);
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 }

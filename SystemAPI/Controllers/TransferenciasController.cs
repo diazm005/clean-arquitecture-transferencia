@@ -2,6 +2,8 @@ using Application.Adapters;
 using Application.Ports;
 using Microsoft.AspNetCore.Mvc;
 using SystemAPI.Helpers;
+using Microsoft.AspNetCore.Authorization;
+using SystemAPI.Handlers;
 namespace SystemAPI.Controllers;
 
 [ApiController]
@@ -9,16 +11,19 @@ namespace SystemAPI.Controllers;
 public sealed class TransferenciasController(IRealizarTransferencia payment, IConsultarTransferencia paymentQuery) : ControllerBase
 {
     /// <summary>
-    /// Initiates a payment execution (InitiatePaymentExecutionResponse): 200 completed, 202 pending, 409 needs OTP or reused reference, 422 rejected, 503 unavailable and 400 invalid request.
+    /// Inicia una transferencia propia: 200 completada, 202 pendiente, 409 OTP o referencia reutilizada,
+    /// 422 rechazada, 503 no disponible, 400 entrada inválida y 401/403 autenticación o permiso insuficiente.
     /// </summary>
     [HttpPost]
+    [Authorize(Policy = JwtHandler.WritePolicy)]
     public async Task<IActionResult> InitiatePaymentExecution(InitiatePaymentExecutionRequest request, CancellationToken ct) =>
         this.ToActionResult(await payment.InitiatePaymentExecutionAsync(Request.ToTrace(), request, ct));
 
     /// <summary>
-    /// Returns the last audited state of a payment execution (RetrievePaymentExecutionResponse) or HTTP 404 when it is not found.
+    /// Consulta el último estado auditado de una transferencia propia; devuelve 404 si no está disponible para el cliente.
     /// </summary>
     [HttpGet("{transactionReference:guid}")]
+    [Authorize(Policy = JwtHandler.ReadPolicy)]
     public async Task<IActionResult> RetrievePaymentExecution(Guid transactionReference, CancellationToken ct) =>
         this.ToActionResult(await paymentQuery.RetrievePaymentExecutionAsync(Request.ToTrace(), transactionReference, ct));
 }

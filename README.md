@@ -1,18 +1,32 @@
 # Clean Architecture: transferencias bancarias
 
+**Nueva etapa del taller:** [API independiente + batch de fraude](https://github.com/diazm005/transferencias-api-antifraude).
+Esa etapa tiene su propio repositorio. Este repositorio contiene la solución
+`SystemApi3.0.slnx` y su API `SystemAPI`.
+
+Modelo SQL del equipo 2: [diagrama ER, diccionario y scripts](database/README.md).
+
+Nueva etapa: [configuración de EF y batch de fraude](docs/EF-Y-FRAUDE.md).
+Seguridad: [JWT, tokens locales y autorización por cliente](docs/JWT.md).
+El modo SQL es opcional y se restringe a `BD_Equipo2`; el modo predeterminado sigue en memoria.
+
 Versión **1.0.0**. API educativa en .NET 10 con reglas de transferencia, adaptadores
 simulados en memoria, auditoría y comprobaciones automatizadas. El OTP es de prueba;
-los datos se reinician al cerrar la aplicación.
+en modo memoria, los datos se reinician al cerrar la aplicación.
 
 ```powershell
 dotnet build SystemApi3.0.slnx -m:1
+$token = ./scripts/nuevo-token.ps1 -Dni 12345678
 dotnet run --project SystemAPI --launch-profile http --no-build
 ```
 
 Swagger: http://localhost:5207/swagger.
+Usa **Authorize** con el token generado. Los endpoints de negocio requieren JWT;
+las guías de seguridad de la plantilla original de abajo no corresponden a la configuración actual.
 
 ```powershell
 dotnet run --project Tests/Transferencias.Tests.csproj --no-build
+dotnet run --project Tests.Api --no-build
 ```
 
 ## Documentación de la plantilla original

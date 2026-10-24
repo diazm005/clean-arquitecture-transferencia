@@ -4,7 +4,7 @@ using Domain.Interfaces;
 namespace CoreBancarioInfrastructure;
 
 // Datos ficticios del taller. El bloqueo agrupa las actualizaciones en memoria; no sustituye una transacción persistente.
-public sealed class CoreBancarioAdapter : IConsultarClienteRepository, IConsultarCuentaRepository, ICoreBancarioGateway
+public sealed class CoreBancarioAdapter : IConsultarClienteRepository, IConsultarCuentaRepository, ICoreBancarioGateway, IConsultarBancoRepository
 {
     private readonly object _sync = new();
     private readonly Dictionary<string, Cliente> _clientes = new()
@@ -20,6 +20,11 @@ public sealed class CoreBancarioAdapter : IConsultarClienteRepository, IConsulta
     };
     private readonly Dictionary<(string, DateOnly), decimal> _acumulados = new();
     private readonly HashSet<Guid> _debitos = new();
+
+    /// <summary>El catálogo de demostración contiene únicamente los dos bancos del taller.</summary>
+    public Task<bool> ExisteAsync(string codigo, CancellationToken ct = default) => Task.FromResult(
+        string.Equals(codigo, "BANCO_A", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(codigo, "BANCO_B", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Busca un cliente en los datos ficticios del taller. Devuelve null si el DNI no está registrado.
