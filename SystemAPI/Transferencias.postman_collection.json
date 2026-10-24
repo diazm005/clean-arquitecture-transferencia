@@ -1,63 +1,138 @@
 {
   "info": {
-    "name": "Transferencias API (BIAN)",
+    "name": "Transferencias - SystemAPI + Fraude.Batch",
+    "description": "Endpoints de SystemAPI (clean-arquitecture-transferencia, puerto 5207) y de Fraude.Batch (transferencias-api-antifraude, puerto 5310).\n\nEl token se genera solo con POST /api/dev/token para el DNI de la variable nationalId y se renueva al vencer. POST /api/transactions modifica datos en SQL.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
-      "key": "batchUrl",
-      "value": "http://localhost:5210"
-    },
-    {
       "key": "baseUrl",
       "value": "http://localhost:5207"
+    },
+    {
+      "key": "batchUrl",
+      "value": "http://127.0.0.1:5310"
+    },
+    {
+      "key": "nationalId",
+      "value": "12345678"
+    },
+    {
+      "key": "accountNumber",
+      "value": "001"
     },
     {
       "key": "transactionReference",
       "value": "11111111-1111-4111-8111-111111111111"
     },
     {
-      "type": "string",
+      "key": "accessToken",
       "value": "",
-      "key": "accessToken"
+      "type": "string",
+      "description": "Se llena automáticamente."
     }
   ],
   "item": [
     {
-      "name": "Batchero HTTP (sin movimientos de dinero)",
+      "name": "SystemAPI",
       "item": [
         {
-          "name": "Disponibilidad del batchero",
-          "request": {
-            "method": "GET",
-            "url": "{{batchUrl}}/health"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Batchero disponible', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().service).to.eql('FraudBatch'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Evaluación de riesgo alto por frecuencia",
+          "name": "Token de desarrollo",
           "request": {
             "method": "POST",
-            "url": "{{batchUrl}}/api/fraud/evaluations",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
               }
             ],
+            "url": "{{baseUrl}}/api/dev/token",
+            "description": "Emite un token de 15 minutos. Solo responde desde localhost.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"amount\": 100,\n  \"previousDebitsIn15Minutes\": 5,\n  \"knownDestination\": true\n}",
+              "raw": "{\n  \"nationalId\": \"{{nationalId}}\",\n  \"readOnly\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Consultar cliente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "MessageIdentifier",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "DeviceIdentifier",
+                "value": "postman-device"
+              },
+              {
+                "key": "ChannelIdentifier",
+                "value": "postman"
+              }
+            ],
+            "url": "{{baseUrl}}/api/client/{{nationalId}}",
+            "description": "Requiere transferencias.read. Solo el cliente del token."
+          }
+        },
+        {
+          "name": "Consultar cuenta",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "MessageIdentifier",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "DeviceIdentifier",
+                "value": "postman-device"
+              },
+              {
+                "key": "ChannelIdentifier",
+                "value": "postman"
+              }
+            ],
+            "url": "{{baseUrl}}/api/account/{{accountNumber}}",
+            "description": "Requiere transferencias.read. Solo cuentas propias."
+          }
+        },
+        {
+          "name": "Realizar transferencia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "MessageIdentifier",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "DeviceIdentifier",
+                "value": "postman-device"
+              },
+              {
+                "key": "ChannelIdentifier",
+                "value": "postman"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions",
+            "description": "Requiere transferencias.write. Evalúa el riesgo con Fraude.Batch antes de debitar. Para confirmar con OTP, reenvía la misma referencia con otpCode 123456.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"{{nationalId}}\",\n  \"sourceAccountNumber\": \"{{accountNumber}}\",\n  \"destinationAccountNumber\": \"EXTERNA\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 100,\n  \"otpCode\": null\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -67,145 +142,100 @@
           },
           "event": [
             {
-              "listen": "test",
+              "listen": "prerequest",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Cinco débitos previos bloquean por riesgo alto', () => { pm.response.to.have.status(200); const r = pm.response.json(); pm.expect(r.riskLevel).to.eql('Alto'); pm.expect(r.transactionReference).to.eql(pm.variables.get('transactionReference')); pm.expect(r.ruleVersion).to.eql('TALLER-1.0'); pm.expect(r.reason).to.be.a('string').and.not.empty; });"
+                  "pm.collectionVariables.set('transactionReference', pm.variables.replaceIn('{{$guid}}'));"
                 ]
               }
             }
           ]
+        },
+        {
+          "name": "Consultar transferencia",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "MessageIdentifier",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "DeviceIdentifier",
+                "value": "postman-device"
+              },
+              {
+                "key": "ChannelIdentifier",
+                "value": "postman"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions/{{transactionReference}}",
+            "description": "Requiere transferencias.read. Usa la referencia de la última transferencia."
+          }
+        },
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/ping",
+            "description": "Público.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Disponibilidad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health/live",
+            "description": "Público.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
         }
-      ],
+      ]
+    },
+    {
+      "name": "Fraude.Batch",
       "auth": {
         "type": "noauth"
-      }
-    },
-    {
-      "name": "Customer",
+      },
       "item": [
         {
-          "name": "RetrieveCustomer (200)",
+          "name": "Disponibilidad",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              }
-            ],
-            "url": "{{baseUrl}}/api/client/12345678"
+            "header": [],
+            "url": "{{batchUrl}}/health",
+            "description": "Estado y versión de regla."
           }
         },
         {
-          "name": "RetrieveCustomer not found (404)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              }
-            ],
-            "url": "{{baseUrl}}/api/client/00000000"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Account",
-      "item": [
-        {
-          "name": "RetrieveAccount (200)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              }
-            ],
-            "url": "{{baseUrl}}/api/account/001"
-          }
-        },
-        {
-          "name": "RetrieveAccount not found (404)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              }
-            ],
-            "url": "{{baseUrl}}/api/account/999"
-          }
-        }
-      ]
-    },
-    {
-      "name": "PaymentExecution",
-      "item": [
-        {
-          "name": "Initiate - completed (200)",
+          "name": "Evaluar riesgo (score)",
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
               }
             ],
+            "url": "{{batchUrl}}/api/fraud/evaluations",
+            "description": "Devuelve riskLevel (Bajo/Medio/Alto), reason y ruleVersion. No usa SQL ni JWT.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"12345678\",\n  \"sourceAccountNumber\": \"001\",\n  \"destinationAccountNumber\": \"EXTERNA\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 100,\n  \"otpCode\": null\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
+              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"amount\": 100,\n  \"previousDebitsIn15Minutes\": 0,\n  \"knownDestination\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
           "event": [
             {
@@ -218,478 +248,42 @@
               }
             }
           ]
-        },
-        {
-          "name": "Initiate - same reference retry (200, no duplicate debit)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"12345678\",\n  \"sourceAccountNumber\": \"001\",\n  \"destinationAccountNumber\": \"EXTERNA\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 100,\n  \"otpCode\": null\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
-          }
-        },
-        {
-          "name": "Initiate - OTP required from 10000 (409)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"12345678\",\n  \"sourceAccountNumber\": \"001\",\n  \"destinationAccountNumber\": \"EXTERNA\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 10000,\n  \"otpCode\": null\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('transactionReference', pm.variables.replaceIn('{{$guid}}'));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Initiate - confirm with OTP 123456 (200)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"12345678\",\n  \"sourceAccountNumber\": \"001\",\n  \"destinationAccountNumber\": \"EXTERNA\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 10000,\n  \"otpCode\": \"123456\"\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
-          }
-        },
-        {
-          "name": "Initiate - high risk (422)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"12345678\",\n  \"sourceAccountNumber\": \"001\",\n  \"destinationAccountNumber\": \"RIESGO_ALTO\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 100,\n  \"otpCode\": null\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('transactionReference', pm.variables.replaceIn('{{$guid}}'));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Initiate - medium risk needs OTP (409)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"12345678\",\n  \"sourceAccountNumber\": \"001\",\n  \"destinationAccountNumber\": \"RIESGO_MEDIO\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 100,\n  \"otpCode\": null\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('transactionReference', pm.variables.replaceIn('{{$guid}}'));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Initiate - antifraud unavailable (503)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"12345678\",\n  \"sourceAccountNumber\": \"001\",\n  \"destinationAccountNumber\": \"SIN_SERVICIO\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 100,\n  \"otpCode\": null\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('transactionReference', pm.variables.replaceIn('{{$guid}}'));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Initiate - clearing house uncertain (202)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"12345678\",\n  \"sourceAccountNumber\": \"001\",\n  \"destinationAccountNumber\": \"CAMARA_TIMEOUT\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 100,\n  \"otpCode\": null\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('transactionReference', pm.variables.replaceIn('{{$guid}}'));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Initiate - insufficient funds (422)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"87654321\",\n  \"sourceAccountNumber\": \"002\",\n  \"destinationAccountNumber\": \"EXTERNA\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 999999,\n  \"otpCode\": null\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('transactionReference', pm.variables.replaceIn('{{$guid}}'));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Initiate - inactive account (422)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"12345678\",\n  \"sourceAccountNumber\": \"003\",\n  \"destinationAccountNumber\": \"EXTERNA\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 100,\n  \"otpCode\": null\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('transactionReference', pm.variables.replaceIn('{{$guid}}'));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Initiate - invalid national id (400)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"1\",\n  \"sourceAccountNumber\": \"001\",\n  \"destinationAccountNumber\": \"EXTERNA\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 100,\n  \"otpCode\": null\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('transactionReference', pm.variables.replaceIn('{{$guid}}'));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Initiate - amount 0 (400)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionReference\": \"{{transactionReference}}\",\n  \"customerNationalId\": \"12345678\",\n  \"sourceAccountNumber\": \"001\",\n  \"destinationAccountNumber\": \"EXTERNA\",\n  \"destinationBank\": \"BANCO_B\",\n  \"amount\": 0,\n  \"otpCode\": null\n}"
-            },
-            "url": "{{baseUrl}}/api/transactions"
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('transactionReference', pm.variables.replaceIn('{{$guid}}'));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "RetrievePaymentExecution (200)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              }
-            ],
-            "url": "{{baseUrl}}/api/transactions/{{transactionReference}}"
-          }
-        },
-        {
-          "name": "RetrievePaymentExecution not found (404)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "MessageIdentifier",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "DeviceIdentifier",
-                "value": "postman-device"
-              },
-              {
-                "key": "ChannelIdentifier",
-                "value": "postman"
-              }
-            ],
-            "url": "{{baseUrl}}/api/transactions/99999999-9999-4999-8999-999999999999"
-          }
         }
       ]
     }
   ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Genera el token automáticamente con el emisor local de la API (solo Development, solo localhost).",
+          "if (pm.request.auth && pm.request.auth.type === 'noauth') return;",
+          "const expires = Number(pm.collectionVariables.get('accessTokenExpires') || 0);",
+          "if (pm.collectionVariables.get('accessToken') && Date.now() < expires - 30000) return;",
+          "pm.sendRequest({",
+          "  url: pm.collectionVariables.get('baseUrl') + '/api/dev/token', method: 'POST',",
+          "  header: { 'Content-Type': 'application/json' },",
+          "  body: { mode: 'raw', raw: JSON.stringify({ nationalId: pm.collectionVariables.get('nationalId') }) }",
+          "}, (err, res) => {",
+          "  if (err || res.code !== 200) { console.warn('No se pudo generar el token', err || res.code); return; }",
+          "  const r = res.json();",
+          "  pm.collectionVariables.set('accessToken', r.accessToken);",
+          "  pm.collectionVariables.set('accessTokenExpires', String(Date.now() + r.expiresIn * 1000));",
+          "});"
+        ]
+      }
+    }
+  ],
   "auth": {
+    "type": "bearer",
     "bearer": [
       {
-        "type": "string",
+        "key": "token",
         "value": "{{accessToken}}",
-        "key": "token"
+        "type": "string"
       }
-    ],
-    "type": "bearer"
+    ]
   }
 }

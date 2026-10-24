@@ -22,7 +22,4 @@
   <Folder Name="/src/Presentation/">
     <Project Path="SystemAPI/SystemAPI.csproj" Id="9ae40961-58be-45b9-b963-1cd9fe36719a" />
   </Folder>
-  <Folder Name="/src/Processes/">
-    <Project Path="FraudBatch/FraudBatch.csproj" />
-  </Folder>
 </Solution>

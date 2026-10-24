@@ -57,7 +57,8 @@ Para volver al simulador usa `$env:Infrastructure__Provider = 'Memory'` y reinic
 El servicio continúa limitado a `Development`: OTP y cámara todavía son simulados.
 JWT y autorización por cliente están implementados; consulta [generación de tokens y permisos](JWT.md).
 
-`Antifraude:BaseUrl` en appsettings apunta a `http://localhost:5210/`. Puede reemplazarse
+`Antifraude:BaseUrl` en appsettings apunta a `http://127.0.0.1:5310/`, el `Fraude.Batch` del repositorio
+`transferencias-api-antifraude`. Para usar el `FraudBatch` local usa `http://localhost:5210/`. Puede reemplazarse
 con `Antifraude__BaseUrl` si el batchero se ejecuta en otra dirección. El endpoint es
 `POST /api/fraud/evaluations`; el contrato y ejemplos están en [FraudBatch](../FraudBatch/README.md).
 

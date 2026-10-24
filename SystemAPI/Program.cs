@@ -3,6 +3,7 @@ using Application.Internals.Adapters;
 using Microsoft.AspNetCore.Mvc;
 using SystemAPI.Helpers;
 using AntifraudeInfrastructure;
+using AntifraudeInfrastructure.Http;
 using AuditoriaInfrastructure;
 using CamaraCompensatorioInfrastructure;
 using CoreBancarioInfrastructure;
@@ -39,7 +40,8 @@ else if (string.Equals(provider, "Memory", StringComparison.OrdinalIgnoreCase))
     builder.Services.AddSingleton<IConsultarBancoRepository>(sp => sp.GetRequiredService<CoreBancarioAdapter>());
     builder.Services.AddSingleton<ICoreBancarioGateway>(sp => sp.GetRequiredService<CoreBancarioAdapter>());
     builder.Services.AddSingleton<IControlOperacion, ControlOperacionMemoria>();
-    builder.Services.AddSingleton<IAntifraudeService, AntifraudeAdapter>();
+    // El riesgo lo calcula Fraude.Batch (transferencias-api-antifraude) también sin SQL.
+    builder.Services.AddFraudBatchAntifraude(builder.Configuration["Antifraude:BaseUrl"]);
     builder.Services.AddSingleton<IAuditoriaRepository, AuditoriaRepository>();
     builder.Services.AddSingleton<ISegmentoLimiteRepository, SegmentoLimiteRepository>();
     builder.Services.AddSingleton<INotificadorCliente, NotificacionesAdapter>();

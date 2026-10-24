@@ -146,10 +146,14 @@ internal static class JwtTests
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
+            // Program.cs lee el proveedor antes de Build; UseSetting llega a tiempo, ConfigureAppConfiguration no.
+            builder.UseSetting("Infrastructure:Provider", "Memory");
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Infrastructure:Provider"] = "Memory", ["Logging:LogLevel:Default"] = "Error"
             }));
+            // El riesgo usa el simulador para no depender de que Fraude.Batch esté levantado.
+            builder.ConfigureServices(services => services.AddSingleton<IAntifraudeService, AntifraudeInfrastructure.AntifraudeAdapter>());
             builder.ConfigureServices(services => services.PostConfigure<JwtBearerOptions>("Bearer", options =>
             {
                 // Solo se sustituye la clave y su emisor de prueba; se conserva la validación del servicio.

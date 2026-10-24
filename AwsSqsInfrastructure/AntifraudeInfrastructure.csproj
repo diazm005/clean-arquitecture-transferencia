@@ -8,6 +8,8 @@
   <PropertyGroup><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
   <ItemGroup>
     <Compile Include="Simulacion/**/*.cs" />
+    <Compile Include="Http/**/*.cs" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../Domain/Domain.csproj" />
   </ItemGroup>
 </Project>

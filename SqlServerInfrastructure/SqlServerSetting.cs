@@ -17,7 +17,7 @@ public static class SqlServerSetting
 {
     /// <summary>Conecta los repositorios SQL y el cliente HTTP del batchero, conservando el seguimiento en SQL.</summary>
     public static IServiceCollection AddSqlServerInfrastructure(this IServiceCollection services, string? connectionString,
-        string? antifraudeBaseUrl = "http://localhost:5210/")
+        string? antifraudeBaseUrl = "http://127.0.0.1:5310/")
     {
         var validated = TransferenciasConnectionString.Validar(connectionString);
         services.AddDbContextFactory<TransferenciasDbContext>(options => options.UseSqlServer(validated,
